@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>Floating Keywords MTG</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@700&family=Futura&display=swap" rel="stylesheet">
+<style>
+body {
+  margin:0;
+  height:100vh;
+  background-color:#fff;
+  font-family:'Noto Sans JP','Futura',sans-serif;
+  overflow:hidden;
+  position:relative;
+}
+body::before {
+  content:'';
+  position:absolute;
+  width:100%; height:100%;
+  background-image: radial-gradient(circle, rgba(200,200,200,0.3) 1px, transparent 1px);
+  background-size:100px 100px;
+  z-index:0;
+  pointer-events:none;
+}
+
+.title {
+  position:absolute;
+  top:20px;
+  left:50%;
+  transform:translateX(-50%);
+  font-weight:bold;
+  color:gray;
+  text-align:center;
+  text-shadow:0 0 20px rgba(150,150,150,0.5);
+  outline:none;
+  z-index:1000;
+}
+
+.input-container {
+  position:absolute;
+  top:50%;
+  left:50%;
+  transform:translate(-50%,-50%);
+  z-index:1000;
+}
+.keyword-input {
+  font-size:1.8rem;
+  font-weight:bold;
+  padding:0.5rem 1rem;
+  border-radius:12px;
+  border:2px solid #ccc;
+  box-shadow:0 8px 16px rgba(0,0,0,0.1);
+  outline:none;
+  width:300px;
+  height:80px;
+  resize:none;
+  font-family:'Noto Sans JP','Futura',sans-serif;
+}
+
+.floating-group {
+  position:absolute;
+  font-weight:bold;
+  white-space:pre;
+  user-select:none;
+  pointer-events:auto;
+  color:black;
+  z-index:500;
+  cursor:pointer;
+}
+
+.color-shadow {
+  position:absolute;
+  top:0; left:0;
+  filter:blur(10px);
+  z-index:400;
+  pointer-events:none;
+}
+
+#next-page {
+  position:absolute;
+  bottom:20px;
+  right:20px;
+  font-size:2rem;
+  cursor:pointer;
+  background:none;
+  border:none;
+  z-index:1000;
+}
+
+.page {
+  position:absolute;
+  width:100%;
+  height:100%;
+}
+</style>
+</head>
+<body>
+
+<div class="page" id="page1">
+  <div class="title" contenteditable="true" id="title1">お題1</div>
+  <div class="input-container">
+    <textarea class="keyword-input" placeholder="Type words..."></textarea>
+  </div>
+</div>
+
+<div class="page" id="page2" style="display:none">
+  <div class="title" contenteditable="true" id="title2">お題2</div>
+  <div class="input-container">
+    <textarea class="keyword-input" placeholder="Type words..."></textarea>
+  </div>
+</div>
+
+<button id="next-page">▶</button>
+
+<script>
+let currentPage = 1;
+const pages = [document.getElementById('page1'),document.getElementById('page2')];
+const nextBtn = document.getElementById('next-page');
+
+nextBtn.addEventListener('click',()=>{
+  pages[currentPage-1].style.display='none';
+  currentPage = currentPage===1?2:1;
+  pages[currentPage-1].style.display='block';
+});
+
+const colors = [
+  'rgba(255,0,0,0.6)','rgba(255,127,0,0.6)','rgba(255,255,0,0.6)',
+  'rgba(127,255,0,0.6)','rgba(0,255,0,0.6)','rgba(0,255,255,0.6)',
+  'rgba(0,0,255,0.6)','rgba(75,0,130,0.6)','rgba(127,0,255,0.6)','rgba(255,0,127,0.6)'
+];
+
+function initFloating(inputElem,pageElem,pageKey,titleElem,titleKey){
+  const groups=[];
+  function randomRange(min,max){return Math.random()*(max-min)+min;}
+
+  // お題の保存/復元
+  const savedTitle = localStorage.getItem(titleKey);
+  if(savedTitle) titleElem.textContent = savedTitle;
+
+  titleElem.addEventListener('input', ()=>{
+    localStorage.setItem(titleKey,titleElem.textContent);
+    adjustTitleSize();
+  });
+
+  function adjustTitleSize(){
+    const len = titleElem.textContent.length;
+    const maxFont = 120;
+    const minFont = 60;
+    const fontSize = Math.max(minFont,maxFont-len*2);
+    titleElem.style.fontSize = fontSize + 'px';
+  }
+  adjustTitleSize();
+
+  // 過去の入力復元
+  const saved=localStorage.getItem(pageKey);
+  if(saved){
+    saved.split('\n').forEach(text=>{if(text.trim()!=='') addGroup(text.trim());});
+  }
+
+  inputElem.addEventListener('keypress',function(e){
+    if(e.key==='Enter' && !e.shiftKey && inputElem.value.trim()!==''){
+      const text=inputElem.value.trim();
+      addGroup(text);
+      localStorage.setItem(pageKey,groups.map(g=>g.textContent).join('\n'));
+      inputElem.value='';
+      e.preventDefault();
+    }
+  });
+
+  function addGroup(text){
+    const group=document.createElement('div');
+    group.className='floating-group';
+    group.textContent=text;
+
+    let x=randomRange(0,window.innerWidth-300);
+    let y=randomRange(0,window.innerHeight-100);
+    group.x=x; group.y=y;
+
+    group.size=randomRange(1.8,4);
+    group.style.fontSize=group.size+'rem';
+
+    group.scale=1; group.scaleDir=Math.random()>0.5?1:-1; group.scaleSpeed=randomRange(0.0002,0.0006);
+    group.vx=randomRange(-1,1); group.vy=randomRange(-1,1);
+
+    // 影
+    const shadowColor=colors[Math.floor(randomRange(0,colors.length))];
+    const shadow=document.createElement('div');
+    shadow.className='color-shadow';
+    shadow.textContent=group.textContent;
+    shadow.style.fontSize=group.size+'rem';
+    shadow.style.color=shadowColor;
+    pageElem.appendChild(shadow);
+    group.shadowElem=shadow;
+
+    // クリックで削除
+    group.addEventListener('click',()=>{
+      group.remove();
+      if(group.shadowElem) group.shadowElem.remove();
+      const remaining=groups.filter(g=>g!==group).map(g=>g.textContent).join('\n');
+      localStorage.setItem(pageKey,remaining);
+      groups.splice(groups.indexOf(group),1);
+    });
+
+    pageElem.appendChild(group);
+    groups.push(group);
+  }
+
+  function animate(){
+    for(let g of groups){
+      g.x+=g.vx;
+      g.y+=g.vy;
+
+      if(g.x<0){ g.x=0; g.vx*=-1;}
+      if(g.x>window.innerWidth-g.offsetWidth){ g.x=window.innerWidth-g.offsetWidth; g.vx*=-1;}
+      if(g.y<0){ g.y=0; g.vy*=-1;}
+      if(g.y>window.innerHeight-g.offsetHeight){ g.y=window.innerHeight-g.offsetHeight; g.vy*=-1;}
+
+      g.scale+=g.scaleSpeed*g.scaleDir;
+      if(g.scale>1.2||g.scale<0.8) g.scaleDir*=-1;
+
+      g.style.transform=`translate(${g.x}px,${g.y}px) scale(${g.scale})`;
+      if(g.shadowElem) g.shadowElem.style.transform=`translate(${g.x}px,${g.y}px) scale(${g.scale})`;
+    }
+    requestAnimationFrame(animate);
+  }
+  animate();
+}
+
+initFloating(document.querySelector('#page1 .keyword-input'),document.getElementById('page1'),'page1Words',document.getElementById('title1'),'page1Title');
+initFloating(document.querySelector('#page2 .keyword-input'),document.getElementById('page2'),'page2Words',document.getElementById('title2'),'page2Title');
+</script>
+</body>
+</html>
