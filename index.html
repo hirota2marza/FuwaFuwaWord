@@ -17,7 +17,7 @@ body::before {
   content:'';
   position:absolute;
   width:100%; height:100%;
-  background-image: radial-gradient(circle, rgba(200,200,200,0.3) 1px, transparent 1px);
+  background-image: radial-gradient(circle, rgba(180,180,180,0.8) 3px, transparent 3px);
   background-size:100px 100px;
   z-index:0;
   pointer-events:none;
@@ -31,9 +31,8 @@ body::before {
   font-weight:bold;
   color:gray;
   text-align:center;
-  text-shadow:0 0 20px rgba(150,150,150,0.5);
-  outline:none;
-  z-index:1000;
+  z-index:1; /* お題は一番下 */
+  pointer-events:auto;
 }
 
 .input-container {
@@ -60,32 +59,24 @@ body::before {
 .floating-group {
   position:absolute;
   font-weight:bold;
-  white-space:pre;
+  white-space:pre-wrap;
   user-select:none;
   pointer-events:auto;
-  color:black;
   z-index:500;
   cursor:pointer;
 }
 
-.color-shadow {
-  position:absolute;
-  top:0; left:0;
-  filter:blur(10px);
-  z-index:400;
-  pointer-events:none;
-}
-
-#next-page {
+.page-button {
   position:absolute;
   bottom:20px;
-  right:20px;
   font-size:2rem;
   cursor:pointer;
   background:none;
   border:none;
   z-index:1000;
 }
+#prev-page { left:20px; }
+#next-page { right:20px; }
 
 .page {
   position:absolute;
@@ -110,37 +101,39 @@ body::before {
   </div>
 </div>
 
-<button id="next-page">▶</button>
+<button id="prev-page" class="page-button">◀</button>
+<button id="next-page" class="page-button">▶</button>
 
 <script>
 let currentPage = 1;
 const pages = [document.getElementById('page1'),document.getElementById('page2')];
 const nextBtn = document.getElementById('next-page');
+const prevBtn = document.getElementById('prev-page');
 
 nextBtn.addEventListener('click',()=>{
   pages[currentPage-1].style.display='none';
   currentPage = currentPage===1?2:1;
   pages[currentPage-1].style.display='block';
 });
+prevBtn.addEventListener('click',()=>{
+  pages[currentPage-1].style.display='none';
+  currentPage = currentPage===1?2:1;
+  pages[currentPage-1].style.display='block';
+});
 
 const colors = [
-  'rgba(255,0,0,0.6)','rgba(255,127,0,0.6)','rgba(255,255,0,0.6)',
-  'rgba(127,255,0,0.6)','rgba(0,255,0,0.6)','rgba(0,255,255,0.6)',
-  'rgba(0,0,255,0.6)','rgba(75,0,130,0.6)','rgba(127,0,255,0.6)','rgba(255,0,127,0.6)'
+  'rgba(255,0,0,0.8)','rgba(255,127,0,0.8)','rgba(255,255,0,0.8)',
+  'rgba(127,255,0,0.8)','rgba(0,255,0,0.8)','rgba(0,255,255,0.8)',
+  'rgba(0,0,255,0.8)','rgba(75,0,130,0.8)','rgba(127,0,255,0.8)','rgba(255,0,127,0.8)'
 ];
 
 function initFloating(inputElem,pageElem,pageKey,titleElem,titleKey){
   const groups=[];
   function randomRange(min,max){return Math.random()*(max-min)+min;}
 
-  // お題の保存/復元
+  // お題保存・読み込み
   const savedTitle = localStorage.getItem(titleKey);
   if(savedTitle) titleElem.textContent = savedTitle;
-
-  titleElem.addEventListener('input', ()=>{
-    localStorage.setItem(titleKey,titleElem.textContent);
-    adjustTitleSize();
-  });
 
   function adjustTitleSize(){
     const len = titleElem.textContent.length;
@@ -151,7 +144,12 @@ function initFloating(inputElem,pageElem,pageKey,titleElem,titleKey){
   }
   adjustTitleSize();
 
-  // 過去の入力復元
+  titleElem.addEventListener('input', ()=>{
+    localStorage.setItem(titleKey,titleElem.textContent);
+    adjustTitleSize();
+  });
+
+  // 単語保存・読み込み
   const saved=localStorage.getItem(pageKey);
   if(saved){
     saved.split('\n').forEach(text=>{if(text.trim()!=='') addGroup(text.trim());});
@@ -167,35 +165,44 @@ function initFloating(inputElem,pageElem,pageKey,titleElem,titleKey){
     }
   });
 
+  inputElem.addEventListener('paste', function(e){
+    e.preventDefault();
+    const text = (e.clipboardData || window.clipboardData).getData('text');
+    document.execCommand('insertText', false, text);
+  });
+
   function addGroup(text){
     const group=document.createElement('div');
     group.className='floating-group';
     group.textContent=text;
+    group.style.fontFamily="'Noto Sans JP','Futura',sans-serif";
 
-    let x=randomRange(0,window.innerWidth-300);
-    let y=randomRange(0,window.innerHeight-100);
+    let x, y, safe=false;
+    while(!safe){
+      x=randomRange(0,window.innerWidth-300);
+      y=randomRange(0,window.innerHeight-100);
+      safe=true;
+      for(let w of groups){
+        const dx=x-w.x;
+        const dy=y-w.y;
+        if(Math.sqrt(dx*dx+dy*dy)<100){safe=false; break;}
+      }
+    }
     group.x=x; group.y=y;
+
+    const colorIndex=Math.floor(randomRange(0,colors.length));
+    const color=colors[colorIndex];
+    group.color=color;
+    group.style.color=color;
 
     group.size=randomRange(1.8,4);
     group.style.fontSize=group.size+'rem';
 
-    group.scale=1; group.scaleDir=Math.random()>0.5?1:-1; group.scaleSpeed=randomRange(0.0002,0.0006);
-    group.vx=randomRange(-1,1); group.vy=randomRange(-1,1);
+    group.scale=1; group.scaleDir=Math.random()>0.5?1:-1; group.scaleSpeed=randomRange(0.0003,0.0006);
+    group.vx=randomRange(-0.7,0.7); group.vy=randomRange(-0.7,0.7); // 少し速く
 
-    // 影
-    const shadowColor=colors[Math.floor(randomRange(0,colors.length))];
-    const shadow=document.createElement('div');
-    shadow.className='color-shadow';
-    shadow.textContent=group.textContent;
-    shadow.style.fontSize=group.size+'rem';
-    shadow.style.color=shadowColor;
-    pageElem.appendChild(shadow);
-    group.shadowElem=shadow;
-
-    // クリックで削除
     group.addEventListener('click',()=>{
       group.remove();
-      if(group.shadowElem) group.shadowElem.remove();
       const remaining=groups.filter(g=>g!==group).map(g=>g.textContent).join('\n');
       localStorage.setItem(pageKey,remaining);
       groups.splice(groups.indexOf(group),1);
@@ -219,7 +226,6 @@ function initFloating(inputElem,pageElem,pageKey,titleElem,titleKey){
       if(g.scale>1.2||g.scale<0.8) g.scaleDir*=-1;
 
       g.style.transform=`translate(${g.x}px,${g.y}px) scale(${g.scale})`;
-      if(g.shadowElem) g.shadowElem.style.transform=`translate(${g.x}px,${g.y}px) scale(${g.scale})`;
     }
     requestAnimationFrame(animate);
   }
